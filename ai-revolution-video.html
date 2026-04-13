@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI变革 · 管理革命</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;700;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #12121a;
+    --accent: #ff4d00;
+    --accent2: #ffb300;
+    --text: #f0ede8;
+    --muted: #6b6880;
+    --line: rgba(255,77,0,0.25);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Noto Serif SC', serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── 顶部进度条 ── */
+  #progress-bar {
+    position: fixed;
+    top: 0; left: 0;
+    height: 3px;
+    width: 0%;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    z-index: 999;
+    transition: width 0.3s ease;
+  }
+
+  /* ── 播放器外壳 ── */
+  .player-shell {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 60px 24px 120px;
+  }
+
+  /* ── 标题区 ── */
+  .hero {
+    text-align: center;
+    padding: 80px 0 60px;
+    position: relative;
+  }
+  .hero::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 50%;
+    transform: translateX(-50%);
+    width: 1px;
+    height: 60px;
+    background: linear-gradient(to bottom, transparent, var(--accent));
+  }
+  .hero-tag {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 4px;
+    color: var(--accent);
+    text-transform: uppercase;
+    margin-bottom: 20px;
+    opacity: 0;
+    animation: fadeUp 0.8s 0.3s forwards;
+  }
+  .hero-title {
+    font-size: clamp(36px, 6vw, 72px);
+    font-weight: 900;
+    line-height: 1.1;
+    letter-spacing: -1px;
+    opacity: 0;
+    animation: fadeUp 0.8s 0.5s forwards;
+  }
+  .hero-title span {
+    color: var(--accent);
+    position: relative;
+  }
+  .hero-title span::after {
+    content: '';
+    position: absolute;
+    bottom: 4px; left: 0; right: 0;
+    height: 3px;
+    background: var(--accent2);
+    transform: scaleX(0);
+    transform-origin: left;
+    animation: lineExpand 0.6s 1.2s forwards;
+  }
+  .hero-sub {
+    margin-top: 20px;
+    font-size: 16px;
+    color: var(--muted);
+    font-family: 'Space Mono', monospace;
+    opacity: 0;
+    animation: fadeUp 0.8s 0.7s forwards;
+  }
+
+  /* ── 视频播放器模拟 ── */
+  .video-player {
+    position: relative;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    overflow: hidden;
+    margin: 40px 0;
+    opacity: 0;
+    animation: fadeUp 0.8s 0.9s forwards;
+  }
+
+  .video-screen {
+    position: relative;
+    width: 100%;
+    padding-top: 56.25%; /* 16:9 */
+    background: #000;
+    overflow: hidden;
+  }
+
+  /* 动态背景 */
+  .video-bg {
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 80% 60% at 20% 50%, rgba(255,77,0,0.12) 0%, transparent 60%),
+      radial-gradient(ellipse 60% 80% at 80% 30%, rgba(255,179,0,0.08) 0%, transparent 60%),
+      #000;
+    animation: bgPulse 8s ease-in-out infinite alternate;
+  }
+  @keyframes bgPulse {
+    0%   { opacity: 0.8; }
+    100% { opacity: 1; }
+  }
+
+  /* 网格线装饰 */
+  .video-grid {
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(255,77,0,0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,77,0,0.04) 1px, transparent 1px);
+    background-size: 60px 60px;
+  }
+
+  /* 字幕区 */
+  .subtitle-area {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px;
+    text-align: center;
+  }
+
+  .chapter-num {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 3px;
+    color: var(--accent);
+    margin-bottom: 16px;
+    opacity: 0;
+    transition: opacity 0.5s;
+  }
+
+  .subtitle-main {
+    font-size: clamp(18px, 3.5vw, 32px);
+    font-weight: 700;
+    line-height: 1.5;
+    color: #fff;
+    max-width: 700px;
+    opacity: 0;
+    transform: translateY(20px);
+    transition: opacity 0.6s, transform 0.6s;
+  }
+
+  .subtitle-main .highlight {
+    color: var(--accent2);
+    border-bottom: 2px solid var(--accent);
+    padding-bottom: 2px;
+  }
+
+  .subtitle-main.visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  .chapter-num.visible {
+    opacity: 1;
+  }
+
+  /* 扫描线效果 */
+  .scanline {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(255,77,0,0.6), transparent);
+    animation: scan 4s linear infinite;
+    pointer-events: none;
+  }
+  @keyframes scan {
+    0%   { top: 0%; opacity: 1; }
+    90%  { opacity: 1; }
+    100% { top: 100%; opacity: 0; }
+  }
+
+  /* 播放控制栏 */
+  .controls {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 14px 20px;
+    background: rgba(10,10,15,0.95);
+    border-top: 1px solid var(--line);
+  }
+
+  .btn-play {
+    width: 40px; height: 40px;
+    border-radius: 50%;
+    border: 2px solid var(--accent);
+    background: transparent;
+    color: var(--accent);
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px;
+    transition: all 0.2s;
+    flex-shrink: 0;
+  }
+  .btn-play:hover {
+    background: var(--accent);
+    color: #fff;
+  }
+
+  .timeline {
+    flex: 1;
+    height: 4px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 2px;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+  }
+  .timeline-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    border-radius: 2px;
+    width: 0%;
+    transition: width 0.3s ease;
+  }
+
+  .time-display {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    color: var(--muted);
+    flex-shrink: 0;
+  }
+
+  /* ── 章节卡片 ── */
+  .chapters {
+    display: grid;
+    gap: 2px;
+    margin: 40px 0;
+  }
+
+  .chapter-card {
+    background: var(--surface);
+    border: 1px solid transparent;
+    border-left: 3px solid transparent;
+    padding: 28px 32px;
+    cursor: pointer;
+    transition: all 0.3s;
+    opacity: 0;
+    transform: translateX(-20px);
+    position: relative;
+    overflow: hidden;
+  }
+  .chapter-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, rgba(255,77,0,0.05), transparent);
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+  .chapter-card:hover::before,
+  .chapter-card.active::before { opacity: 1; }
+
+  .chapter-card.active {
+    border-color: var(--accent);
+    border-left-color: var(--accent);
+  }
+  .chapter-card:hover {
+    border-color: rgba(255,77,0,0.4);
+    border-left-color: var(--accent);
+  }
+  .chapter-card.visible {
+    opacity: 1;
+    transform: translateX(0);
+  }
+
+  .card-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 12px;
+  }
+  .card-index {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    color: var(--accent);
+    letter-spacing: 2px;
+    flex-shrink: 0;
+  }
+  .card-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text);
+  }
+  .card-body {
+    font-size: 14px;
+    line-height: 1.8;
+    color: var(--muted);
+    padding-left: 52px;
+  }
+  .card-body strong {
+    color: var(--accent2);
+    font-weight: 700;
+  }
+
+  /* ── 结论区 ── */
+  .conclusion {
+    margin: 60px 0;
+    padding: 48px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    position: relative;
+    opacity: 0;
+    animation: fadeUp 0.8s 1.5s forwards;
+  }
+  .conclusion::before {
+    content: '"';
+    position: absolute;
+    top: -20px; left: 32px;
+    font-size: 120px;
+    color: var(--accent);
+    opacity: 0.15;
+    font-family: Georgia, serif;
+    line-height: 1;
+  }
+  .conclusion-title {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 4px;
+    color: var(--accent);
+    margin-bottom: 20px;
+  }
+  .conclusion-text {
+    font-size: 20px;
+    font-weight: 700;
+    line-height: 1.7;
+    color: var(--text);
+  }
+  .conclusion-text em {
+    color: var(--accent2);
+    font-style: normal;
+  }
+
+  /* ── 转型三轴 ── */
+  .transform-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 2px;
+    margin: 40px 0;
+  }
+  @media (max-width: 600px) {
+    .transform-grid { grid-template-columns: 1fr; }
+  }
+  .transform-item {
+    background: var(--surface);
+    padding: 28px 24px;
+    border-top: 3px solid transparent;
+    opacity: 0;
+    transform: translateY(20px);
+    transition: all 0.3s;
+  }
+  .transform-item.visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  .transform-item:nth-child(1) { border-color: var(--accent); transition-delay: 0.1s; }
+  .transform-item:nth-child(2) { border-color: var(--accent2); transition-delay: 0.2s; }
+  .transform-item:nth-child(3) { border-color: #00d4ff; transition-delay: 0.3s; }
+
+  .transform-from {
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 8px;
+    font-family: 'Space Mono', monospace;
+  }
+  .transform-arrow {
+    font-size: 20px;
+    margin: 8px 0;
+    color: var(--accent);
+  }
+  .transform-to {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text);
+  }
+
+  /* ── 动画 ── */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(24px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes lineExpand {
+    to { transform: scaleX(1); }
+  }
+
+  /* ── 底部 ── */
+  .footer {
+    text-align: center;
+    padding: 40px 0;
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 2px;
+    border-top: 1px solid var(--line);
+  }
+</style>
+</head>
+<body>
+
+<div id="progress-bar"></div>
+
+<div class="player-shell">
+
+  <!-- 标题 -->
+  <div class="hero">
+    <div class="hero-tag">INSIGHT · 2026</div>
+    <h1 class="hero-title">AI变革是一场<br><span>管理革命</span></h1>
+    <p class="hero-sub">// 克服人的阻力 × 重构流程链路 × 智能范式跃迁</p>
+  </div>
+
+  <!-- 视频播放器 -->
+  <div class="video-player">
+    <div class="video-screen">
+      <div class="video-bg"></div>
+      <div class="video-grid"></div>
+      <div class="scanline"></div>
+      <div class="subtitle-area">
+        <div class="chapter-num" id="chapterNum">CHAPTER 00</div>
+        <div class="subtitle-main" id="subtitleText">点击播放，开始演讲</div>
+      </div>
+    </div>
+    <div class="controls">
+      <button class="btn-play" id="playBtn" onclick="togglePlay()">▶</button>
+      <div class="timeline" onclick="seekTo(event)">
+        <div class="timeline-fill" id="timelineFill"></div>
+      </div>
+      <div class="time-display" id="timeDisplay">0:00 / 2:30</div>
+      <audio id="audioPlayer" src="ai-revolution.mp3" preload="auto"></audio>
+    </div>
+  </div>
+
+  <!-- 章节卡片 -->
+  <div class="chapters" id="chapters">
+
+    <div class="chapter-card" data-index="0" onclick="jumpTo(0)">
+      <div class="card-header">
+        <span class="card-index">01 ·</span>
+        <span class="card-title">克服"人的阻力"</span>
+      </div>
+      <div class="card-body">
+        最大的坑往往不是技术，而是<strong>人</strong>。真正的变革必须是<strong>自上而下</strong>的系统工程——将AI定位为员工的"外挂"与"助手"，而非对手。以<strong>一把手工程</strong>驱动认知转变，让AI成为赋能工具。
+      </div>
+    </div>
+
+    <div class="chapter-card" data-index="1" onclick="jumpTo(1)">
+      <div class="card-header">
+        <span class="card-index">02 ·</span>
+        <span class="card-title">克服"流程的阻力"</span>
+      </div>
+      <div class="card-body">
+        AI的价值不在于对旧流程打"技术补丁"，而在于<strong>智能重构</strong>。识别重复、枯燥、易错环节，<strong>小步快跑</strong>试点，验证后果断<strong>切断旧链路</strong>，实现从"连接"到"智联"的根本转变。
+      </div>
+    </div>
+
+    <div class="chapter-card" data-index="2" onclick="jumpTo(2)">
+      <div class="card-header">
+        <span class="card-index">03 ·</span>
+        <span class="card-title">管理范式跃迁</span>
+      </div>
+      <div class="card-body">
+        AI深入应用本质上驱动了一场<strong>管理革命</strong>。领导者需以战略决心同时攻克"人"与"流程"两大核心壁垒，方能将AI潜力转化为真正的<strong>企业竞争力</strong>。
+      </div>
+    </div>
+
+  </div>
+
+  <!-- 转型三轴 -->
+  <div class="transform-grid" id="transformGrid">
+    <div class="transform-item">
+      <div class="transform-from">经验驱动</div>
+      <div class="transform-arrow">↓</div>
+      <div class="transform-to">智能驱动</div>
+    </div>
+    <div class="transform-item">
+      <div class="transform-from">指挥控制</div>
+      <div class="transform-arrow">↓</div>
+      <div class="transform-to">协调赋能</div>
+    </div>
+    <div class="transform-item">
+      <div class="transform-from">线性流程</div>
+      <div class="transform-arrow">↓</div>
+      <div class="transform-to">智能化流程</div>
+    </div>
+  </div>
+
+  <!-- 结论 -->
+  <div class="conclusion">
+    <div class="conclusion-title">// CONCLUSION</div>
+    <div class="conclusion-text">
+      成功的关键在于，领导者以<em>战略决心</em>同时攻克"人"与"流程"这两大核心壁垒，方能将AI潜力转化为真正的<em>企业竞争力</em>。
+    </div>
+  </div>
+
+  <div class="footer">AI REVOLUTION · MANAGEMENT PARADIGM SHIFT · 2026</div>
+
+</div>
+
+<script>
+// ── 字幕脚本 ──
+const slides = [
+  { chapter: 'INTRO · 00', text: 'AI落地是一场<span class="highlight">管理革命</span>' },
+  { chapter: 'CHAPTER · 01', text: '最大的坑往往不是技术，而是<span class="highlight">人</span>' },
+  { chapter: 'CHAPTER · 01', text: '真正的变革必须是<span class="highlight">自上而下</span>的系统工程' },
+  { chapter: 'CHAPTER · 01', text: '将AI定位为员工的<span class="highlight">"外挂"与"助手"</span>' },
+  { chapter: 'CHAPTER · 01', text: '以<span class="highlight">一把手工程</span>驱动认知转变' },
+  { chapter: 'CHAPTER · 02', text: 'AI的价值在于对流程的<span class="highlight">智能重构</span>' },
+  { chapter: 'CHAPTER · 02', text: '识别重复、枯燥、易错环节，<span class="highlight">小步快跑</span>' },
+  { chapter: 'CHAPTER · 02', text: '验证后果断<span class="highlight">切断旧链路</span>' },
+  { chapter: 'CHAPTER · 02', text: '从"连接"到<span class="highlight">"智联"</span>的根本转变' },
+  { chapter: 'CONCLUSION · 03', text: '从<span class="highlight">经验驱动</span>到<span class="highlight">智能驱动</span>' },
+  { chapter: 'CONCLUSION · 03', text: '从<span class="highlight">指挥控制</span>到<span class="highlight">协调赋能</span>' },
+  { chapter: 'CONCLUSION · 03', text: '将AI潜力转化为真正的<span class="highlight">企业竞争力</span>' },
+];
+
+const chapterMap = [0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2];
+
+let currentSlide = 0;
+let isPlaying = false;
+let timer = null;
+let elapsed = 0;
+let totalSeconds = 150; // 默认2:30
+
+const subtitleEl = document.getElementById('subtitleText');
+const chapterNumEl = document.getElementById('chapterNum');
+const playBtn = document.getElementById('playBtn');
+const timelineFill = document.getElementById('timelineFill');
+const timeDisplay = document.getElementById('timeDisplay');
+const progressBar = document.getElementById('progress-bar');
+const audioPlayer = document.getElementById('audioPlayer');
+
+// 获取实际音频时长
+audioPlayer.addEventListener('loadedmetadata', function() {
+  totalSeconds = audioPlayer.duration;
+  const m = Math.floor(totalSeconds / 60);
+  const s = Math.floor(totalSeconds % 60);
+  timeDisplay.textContent = `0:${s.toString().padStart(2,'0')} / ${m}:${s.toString().padStart(2,'0')}`;
+});
+
+function showSlide(idx) {
+  const s = slides[idx];
+  chapterNumEl.classList.remove('visible');
+  subtitleEl.classList.remove('visible');
+  setTimeout(() => {
+    chapterNumEl.textContent = s.chapter;
+    subtitleEl.innerHTML = s.text;
+    chapterNumEl.classList.add('visible');
+    subtitleEl.classList.add('visible');
+  }, 300);
+
+  // 高亮对应章节卡片
+  document.querySelectorAll('.chapter-card').forEach((c, i) => {
+    c.classList.toggle('active', i === chapterMap[idx]);
+  });
+}
+
+function togglePlay() {
+  isPlaying = !isPlaying;
+  playBtn.textContent = isPlaying ? '⏸' : '▶';
+  if (isPlaying) {
+    showSlide(currentSlide);
+    audioPlayer.play();
+    timer = setInterval(tick, 100);
+  } else {
+    audioPlayer.pause();
+    clearInterval(timer);
+  }
+}
+
+function tick() {
+  elapsed = audioPlayer.currentTime;
+  if (audioPlayer.ended) {
+    elapsed = totalSeconds;
+    clearInterval(timer);
+    isPlaying = false;
+    playBtn.textContent = '▶';
+  }
+  updateUI();
+
+  // 每 ~12.5 秒换一张字幕
+  const slideInterval = totalSeconds / slides.length;
+  const newSlide = Math.min(Math.floor(elapsed / slideInterval), slides.length - 1);
+  if (newSlide !== currentSlide) {
+    currentSlide = newSlide;
+    showSlide(currentSlide);
+  }
+}
+
+function updateUI() {
+  const pct = (elapsed / totalSeconds) * 100;
+  timelineFill.style.width = pct + '%';
+  progressBar.style.width = pct + '%';
+  const m = Math.floor(elapsed / 60);
+  const s = elapsed % 60;
+  timeDisplay.textContent = `${m}:${s.toString().padStart(2,'0')} / 2:30`;
+}
+
+function seekTo(e) {
+  const rect = e.currentTarget.getBoundingClientRect();
+  const pct = (e.clientX - rect.left) / rect.width;
+  const seekTime = pct * totalSeconds;
+  audioPlayer.currentTime = seekTime;
+  elapsed = seekTime;
+  currentSlide = Math.min(Math.floor(elapsed / (totalSeconds / slides.length)), slides.length - 1);
+  showSlide(currentSlide);
+  updateUI();
+}
+
+function jumpTo(chapterIdx) {
+  const slideIdx = chapterMap.indexOf(chapterIdx);
+  if (slideIdx >= 0) {
+    const seekTime = (slideIdx / slides.length) * totalSeconds;
+    audioPlayer.currentTime = seekTime;
+    elapsed = seekTime;
+    currentSlide = slideIdx;
+    showSlide(currentSlide);
+    updateUI();
+    if (!isPlaying) {
+      isPlaying = true;
+      playBtn.textContent = '⏸';
+      audioPlayer.play();
+      timer = setInterval(tick, 100);
+    }
+  }
+}
+
+// ── Intersection Observer 入场动画 ──
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      e.target.classList.add('visible');
+    }
+  });
+}, { threshold: 0.15 });
+
+document.querySelectorAll('.chapter-card, .transform-item').forEach(el => observer.observe(el));
+
+// 滚动进度
+window.addEventListener('scroll', () => {
+  const scrolled = window.scrollY;
+  const total = document.body.scrollHeight - window.innerHeight;
+  if (!isPlaying) {
+    progressBar.style.width = (scrolled / total * 100) + '%';
+  }
+});
+</script>
+</body>
+</html>
