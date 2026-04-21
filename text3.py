@@ -4,3 +4,4 @@ print(pinyin("拼音蜗牛"))
 
 print("Hello, world!")
 a = 2 + 3
+print("新的打印输出")
